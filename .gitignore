@@ -1,0 +1,8 @@
+*.csv
+*.npy
+*.h5
+*.log
+data/
+results/
+performance/
+logs/

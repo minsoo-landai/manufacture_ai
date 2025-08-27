@@ -1,0 +1,98 @@
+{
+  "data": {
+    "detect_dir": "data/raw_data/",
+    "reference_dir": "data/reference/normal_reference.wav",
+    "raw_data_dir": "data/raw_data",
+    "sound_raw_dir": "data/raw_data/sound",
+    "vib_raw_dir": "data/raw_data/vibration",
+    "segments_dir": "data/segments",
+    "images_dir": "data/images",
+    "sound_reserved_dir": "data/sound_reserved",
+    "vib_reserved_dir": "data/vib_reserved"
+  },
+  "ai": {
+    "model_path": "models/autoencoder.h5",
+    "threshold": 0.5,
+    "sample_rate": 16000,
+    "enable_auto_sample_rate": false,
+    "candidate_sample_rates": [
+      8000,
+      16000,
+      22050,
+      44100,
+      48000
+    ],
+    "n_mels": 128,
+    "hop_length": 512
+  },
+  "detection": {
+    "margin": 1.05,
+    "ae_weight": 0.5,
+    "dtw_weight": 0.5,
+    "dtw_threshold": 30000.0,
+    "ae_threshold": 0.005,
+    "epochs": 300,
+    "batch_size": 16,
+    "learning_rate": 0.001,
+    "validation_split": 0.2,
+    "early_stopping_patience": 10,
+    "clip_duration": 3.0,
+    "n_mfcc": 13,
+    "ae_threshold_percentile": 85,
+    "min_dtw_threshold": 1.0
+  },
+  "preprocessing": {
+    "save_spectrograms": true,
+    "save_waveforms": true
+  },
+  "storage": {
+    "type": "local_filesystem",
+    "project_id": "ai-quality-assessment",
+    "bucket_name": "manu_bucket_ai",
+    "credentials_path": "ai-quality-assessment-cf197e77fc07.json",
+    "audio_prefix": "test/",
+    "results_prefix": "results/",
+    "use_memory_processing": false,
+    "max_files_per_day": 30000
+  },
+  "performance": {
+    "check_interval": 30,
+    "save_performance_csv": true,
+    "save_evaluation_csv": true
+  },
+  "evaluation": {
+    "save_evaluation_results": true,
+    "evaluation_csv_path": "results/evaluation_results.csv",
+    "performance_metrics": [
+      "accuracy",
+      "precision",
+      "recall",
+      "f1_score"
+    ]
+  },
+  "vibration": {
+    "fs": 16,
+    "duration": 3,
+    "skiprows": 0,
+    "model_path": "models/vib_cnn_ae.keras",
+    "threshold_path": "models/vib_cnn_thresh.npy",
+    "cache_path": "models/vib_images.npy",
+    "ae_weight": 0.5,
+    "dtw_weight": 0.5,
+    "margin": 1.0,
+    "progress_step": 5,
+    "epochs": 300,
+    "batch_size": 8,
+    "validation_split": 0.2,
+    "early_stopping_patience": 10,
+    "train_folder": "data/raw_data/vib_normal",
+    "test_folder": "data/raw_data/vib_abnormal",
+    "dtw_threshold": 1000.0,
+    "ae_threshold": 0.05
+  },
+  "logging": {
+    "level": "INFO",
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    "file_path": "logs/main.log"
+  }
+}
