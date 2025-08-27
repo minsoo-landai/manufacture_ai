@@ -6,3 +6,4 @@ data/
 results/
 performance/
 logs/
+*.json
