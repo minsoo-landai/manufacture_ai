@@ -11,12 +11,11 @@ def file_check_if_run(shared_queue, vib_shared_queue, path, log_file, log_level,
             args=(shared_queue, vib_shared_queue, path, log_file, log_level, log_format)
             #args=(logger, shared_queue)
         )
-        #process.start()
-        print("소리/진동 파일 체크 프로세스 시작")
+        print("소리/진동 파일 체크 프로세스 준비 완료")
         return process
             
     except Exception as e:
-        print(f"소리/진동 파일 체크 프로세스 시작 실패 : {e}")
+        print(f"소리/진동 파일 체크 프로세스 준비 실패 : {e}")
         raise
 
     
