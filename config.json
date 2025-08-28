@@ -1,7 +1,7 @@
 {
   "data": {
     "detect_dir": "/home/minsoo0807/deagu_manufacture_ai/data/raw_data",
-    "reference_dir": "data/reference/normal_reference.wav",
+    "reference_dir": "/home/minsoo0807/deagu_manufacture_ai/data/reference/reference.wav",
     "raw_data_dir": "data/raw_data",
     "sound_raw_dir": "data/raw_data/sound",
     "vib_raw_dir": "data/raw_data/vibration",
@@ -88,11 +88,16 @@
     "train_folder": "data/raw_data/vib_normal",
     "test_folder": "data/raw_data/vib_abnormal",
     "dtw_threshold": 1000.0,
-    "ae_threshold": 0.05
+    "ae_threshold": 0.05,
+    "ae_min": 3.4392164707242046e-06,
+    "ae_max": 1.56187543325359e-05,
+    "dtw_min": 5.972559343454649,
+    "dtw_max": 12.542268826856152,
+    "final_threshold": 0.542133984436834
   },
   "logging": {
     "level": "INFO",
     "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     "file_path": "logs/main.log"
   }
-} 
+}

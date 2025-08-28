@@ -147,13 +147,14 @@ def load_multiple_csvs_for_training(folder_path, fs=1000, duration=3):
     }
     return vib_xyz_dict
 
-def load_and_preprocess_vibration_data_from_folder(folder_path, fs=1000, duration=3):
+def load_and_preprocess_vibration_data_from_folder(folder_path, fs=16, duration=3):
     """
-    폴더 내의 모든 CSV 파일을 로드하고 슬라이딩 윈도우로 분할된 진동 데이터를 반환합니다.
+    폴더 내의 모든 CSV 파일을 로드하고 각 파일을 개별적으로 처리합니다.
+    각 파일이 이미 3초 데이터라면 파일별로 하나의 윈도우로 처리합니다.
 
     Args:
         folder_path (str): CSV 파일들이 있는 폴더 경로
-        fs (int): 샘플링 주파수 (Hz)
+        fs (int): 샘플링 주파수 (Hz) - 기본값을 16Hz로 변경
         duration (int): 윈도우 길이 (초)
 
     Returns:
@@ -162,36 +163,89 @@ def load_and_preprocess_vibration_data_from_folder(folder_path, fs=1000, duratio
     csv_files = glob.glob(os.path.join(folder_path, "*.csv"))
     csv_files.sort()  # 파일명 순서대로 정렬
     
+    print(f"▶ {len(csv_files)}개의 CSV 파일을 찾았습니다.")
+    
     all_acc1, all_acc2, all_acc3 = [], [], []
     all_filenames = []  # 파일명 추적용
     
     for csv_file in tqdm(csv_files, desc="CSV 파일 로딩 중"):
         try:
-            # 개별 파일을 로드하고 윈도우로 분할
-            file_data = load_and_preprocess_vibration_data(csv_file, fs, duration)
-            if file_data is None:
-                continue
-                
-            # 윈도우 데이터 추가
-            all_acc1.extend(file_data["Acc1"])
-            all_acc2.extend(file_data["Acc2"])
-            all_acc3.extend(file_data["Acc3"])
+            # CSV 파일 로드 (헤더가 있는 경우)
+            df = pd.read_csv(csv_file)
             
-            # 파일명 저장 (각 윈도우마다 해당 파일명을 추적)
+            # 컬럼명 확인 및 매핑
+            if 'x' in df.columns and 'y' in df.columns and 'z' in df.columns:
+                # 새로운 형식: x, y, z 컬럼
+                acc1 = df['x'].values.astype(float)
+                acc2 = df['y'].values.astype(float)
+                acc3 = df['z'].values.astype(float)
+            elif 'Acc1' in df.columns and 'Acc2' in df.columns and 'Acc3' in df.columns:
+                # 기존 형식: Acc1, Acc2, Acc3 컬럼
+                acc1 = df['Acc1'].values.astype(float)
+                acc2 = df['Acc2'].values.astype(float)
+                acc3 = df['Acc3'].values.astype(float)
+            else:
+                print(f"⚠ 경고: {csv_file}에서 적절한 컬럼을 찾을 수 없습니다. 건너뜁니다.")
+                continue
+            
+            # 파일별로 개별 처리
             filename = os.path.basename(csv_file)
-            for _ in range(len(file_data["Acc1"])):
-                all_filenames.append([filename])
-                
+            
+            # 각 파일을 하나의 윈도우로 처리
+            all_acc1.append(acc1)
+            all_acc2.append(acc2)
+            all_acc3.append(acc3)
+            all_filenames.append(filename)
+            
         except Exception as e:
-            print(f"⚠ 경고: {csv_file} 로딩 실패 - {e}")
+            print(f"⚠ 오류: {csv_file} 로딩 중 오류 발생 - {e}")
             continue
     
+    if not all_acc1:
+        raise ValueError("로드된 데이터가 없습니다. 폴더 경로와 CSV 파일 형식을 확인해주세요.")
+    
+    print(f"▶ 총 {len(all_acc1)}개 파일 로드 완료")
+    
+    # 각 파일의 데이터 길이 확인
+    file_lengths = [len(acc1) for acc1 in all_acc1]
+    print(f"▶ 파일별 데이터 길이: 최소 {min(file_lengths)}, 최대 {max(file_lengths)}")
+    
+    # 윈도우 크기 확인 (실제 데이터에 맞게 조정)
+    expected_win_len = fs * duration  # 16Hz × 3초 = 48개 샘플
+    actual_min_len = min(file_lengths)
+    
+    # 실제 데이터 길이에 맞게 윈도우 크기 조정
+    if actual_min_len < expected_win_len:
+        print(f"⚠ 실제 데이터 길이({actual_min_len})가 예상 길이({expected_win_len})보다 짧습니다.")
+        print(f"⚠ 윈도우 크기를 {actual_min_len}개 샘플로 조정합니다.")
+        win_len = actual_min_len
+    else:
+        win_len = expected_win_len
+    
+    print(f"▶ 최종 윈도우 크기: {win_len}개 샘플")
+    
+    # 데이터 길이가 윈도우 크기와 다른 경우 처리
+    processed_acc1, processed_acc2, processed_acc3, processed_filenames = [], [], [], []
+    
+    for i, (acc1, acc2, acc3, filename) in enumerate(zip(all_acc1, all_acc2, all_acc3, all_filenames)):
+        if len(acc1) >= win_len:
+            # 윈도우 크기만큼만 사용
+            processed_acc1.append(acc1[:win_len])
+            processed_acc2.append(acc2[:win_len])
+            processed_acc3.append(acc3[:win_len])
+            processed_filenames.append(filename)
+        else:
+            # 윈도우 크기보다 작으면 패딩 또는 건너뛰기
+            print(f"⚠ 경고: {filename}의 데이터가 너무 짧습니다 ({len(acc1)} < {win_len}). 건너뜁니다.")
+    
     vib_xyz_dict = {
-        "Acc1": all_acc1,
-        "Acc2": all_acc2,
-        "Acc3": all_acc3,
-        "filenames": all_filenames
+        "Acc1": processed_acc1,
+        "Acc2": processed_acc2,
+        "Acc3": processed_acc3,
+        "filenames": processed_filenames,
     }
+
+    print(f"▶ {len(vib_xyz_dict['Acc1'])}개의 윈도우 생성 완료")
     return vib_xyz_dict
 
 def load_and_preprocess_vibration_data(csv_file, fs=1000, duration=3):
@@ -229,33 +283,33 @@ def load_and_preprocess_vibration_data(csv_file, fs=1000, duration=3):
         return None
 
 # 스펙트로그램 변환
-def vibration_to_spectrogram_array(signal, fs=1000):
+def vibration_to_spectrogram_array(signal, fs=16):
     """
-    #### 1D 신호 >>> 2D 이미지(Time-Frequency Spectrogram) 변환 
-    : 시간-주파수 영역으로 변환 위해 STFT(Short-Time Fouier Transform) 기반 스펙트트럼 사용 
+    #### 1D 신호 >>> 2D 이미지(Time-Frequency Spectrogram) 변환
+    : 시간-주파수 영역으로 변환 위해 STFT(Short-Time Fouier Transform) 기반 스펙트트럼 사용
+
+    1) 파라미터 설정값 - 데이터 길이에 맞게 동적 조정
+    - fs : 실제 샘플링 주파수 (16Hz)
+    - nperseg : 데이터 길이에 맞게 조정 (최소 4개 샘플)
+    - noverlap : nperseg의 절반 이하로 설정
+
+    ** 제조 설비 진동은 보통 10ms ~ 수백 ms 사이 순간적 이상 이벤트 발생
+      0.25초 단위는 한 주기 또는 이상 발생 패턴 하나를 포착하기에 충분한 시간 분해능 가짐
+    * 50% overlap(추가 고민 필요) : 고주파 불량 신호가 짧은시간 동안 고에너지를 띌 경우 겹침 처리로 누락 방지
+    """
+    # 데이터 길이에 맞게 파라미터 동적 조정
+    signal_length = len(signal)
     
-    1) 파라미터 설정값
-    - fs : 1초당 1000개 샘플링율 (1000Hz) ; 약 0.25초 간격 윈도우 
-    - nperseg : 한 STFT에 윈도우에 들어가는 샘플 수 (=256ms 길이)
-      * nperseg 작으면 > 짧은 구간을 자주 분할 > 시간적으로 더 세밀한 위치 탐지 가능 
-    - noverlap : 인접 윈도우 간 절반 겹침 (128ms)
-
-    ** fs / nperseg = 1000/256 = 3.9Hz 주파수 해상도
-      - 주파수 해상도는 낮을수록 미세 진동 차이까지 분석 가능
-      - 스펙트럼 상에서 서로 다른 주파수 성분을 얼마나 잘 분리해내는가 
-      - 3.9Hz 해상도는 공작기계/전동 모터/베어링 계열 나타나는 세부 진동 모드 분해가 가능 
-
-    * 제조 설비 진동은 보통 10ms ~ 수백 ms 사이 순간적 이상 이벤트 발생
-      0.25초 단위는 한 주기 또는 이상 발생 패턴 하나를 포착하기에 충분한 시간 분해능 가짐 
-    * 50% overlap(추가 고민 필요) : 고주파 불량 신호가 짧은시간 동안 고에너지를 띌 경우 겹침 처리로 누락 방지 
-    """
-    # 신호 길이에 따라 동적으로 nperseg와 noverlap 조정
-    if len(signal) < 256:
-        nperseg = min(len(signal), 64)
-        noverlap = max(1, nperseg // 2)
-    else:
-        nperseg = 256
-        noverlap = 128
+    # nperseg를 데이터 길이의 절반으로 설정 (최소 4개)
+    nperseg = max(4, min(signal_length // 2, 256))
+    
+    # noverlap을 nperseg의 절반으로 설정 (nperseg보다 작게)
+    noverlap = max(1, nperseg // 2)
+    
+    # 데이터가 너무 짧으면 전체 데이터를 사용
+    if signal_length < nperseg:
+        nperseg = signal_length
+        noverlap = 0
     
     f, t, Sxx = spectrogram(signal, fs=fs, nperseg=nperseg, noverlap=noverlap)
 
@@ -688,9 +742,18 @@ def detect_proc_worker(vib_shared_queue, detect_queue, db_queue, config_info, lo
         dtw_weight = config_info.get_config("vibration.dtw_weight", 0.5)
         progress_step = int(config_info.get_config("vibration.progress_step", 5))
         
-        # config에서 임계값 가져오기
-        dtw_threshold = config_info.get_config("vibration.dtw_threshold", 1000.0)
-        ae_threshold = config_info.get_config("vibration.ae_threshold", 0.05)
+        # 학습 코드와 동일한 정규화 파라미터 사용 (config.json에서 로드)
+        ae_min = config_info.get_config("vibration.ae_min", 0.0)
+        ae_max = config_info.get_config("vibration.ae_max", 1.0)
+        dtw_min = config_info.get_config("vibration.dtw_min", 0.0)
+        dtw_max = config_info.get_config("vibration.dtw_max", 1.0)
+        
+        # 학습에서 계산된 최종 임계값 사용
+        final_threshold = config_info.get_config("vibration.final_threshold", 0.5)
+        
+        logger.info(f"진동 설정 - fs: {fs}Hz, duration: {duration}s")
+        logger.info(f"정규화 파라미터 - AE: {ae_min:.6f}~{ae_max:.6f}, DTW: {dtw_min:.6f}~{dtw_max:.6f}")
+        logger.info(f"최종 임계값: {final_threshold:.6f}")
 
         # 초기 margin 설정
         margin = float(config_info.get_config("vibration.margin", 1.0))
@@ -699,7 +762,7 @@ def detect_proc_worker(vib_shared_queue, detect_queue, db_queue, config_info, lo
         try:
             autoencoder = tf.keras.models.load_model(model_path, compile=False)
             logger.info(f"진동 모델 로드 완료: {model_path}")
-            logger.info(f"진동 임계값 설정: dtw_threshold={dtw_threshold}, ae_threshold={ae_threshold}")
+            logger.info(f"진동 임계값 설정: final_threshold={final_threshold}")
         except Exception as e:
             logger.error(f"진동 모델 로드 실패: {e}")
             return
@@ -784,11 +847,17 @@ def detect_proc_worker(vib_shared_queue, detect_queue, db_queue, config_info, lo
                             # DTW 거리 계산
                             dtw_dist = compute_2d_dtw(img.squeeze(), recon.squeeze())
 
-                            # config 임계값을 사용한 점수 계산 (소리 탐지와 동일한 방식)
-                            score = (ae_loss / ae_threshold) * ae_weight + (dtw_dist / dtw_threshold) * dtw_weight
+                            # 학습 코드와 동일한 정규화 방식 적용
+                            ae_norm = (ae_loss - ae_min) / (ae_max - ae_min + 1e-8)
+                            dtw_norm = (dtw_dist - dtw_min) / (dtw_max - dtw_min + 1e-8)
+                            
+                            # 학습 코드와 동일한 최종 점수 계산
+                            final_score = ae_weight * ae_norm + dtw_weight * dtw_norm
 
-                            # 이상 탐지 (margin 적용)
-                            is_anomaly = score > margin
+                            # 학습에서 계산된 임계값으로 이상 탐지
+                            is_anomaly = final_score > final_threshold
+                            
+                            logger.debug(f"세그먼트 {idx} - AE: {ae_loss:.6f}->{ae_norm:.6f}, DTW: {dtw_dist:.6f}->{dtw_norm:.6f}, 최종: {final_score:.6f}, 임계값: {final_threshold:.6f}")
 
                             if is_anomaly:
                                 any_bad = True
@@ -805,11 +874,11 @@ def detect_proc_worker(vib_shared_queue, detect_queue, db_queue, config_info, lo
                                     'result': "불량품" if is_anomaly else "정상품",
                                     'ae_loss': float(ae_loss),
                                     'dtw_score': float(dtw_dist),
-                                    'final_score': float(score),
+                                    'final_score': float(final_score),
                                     'duration': duration,
                                     'sample_rate': fs
                                 }, block=False)
-                                logger.info(f"진동 세그먼트 결과 큐 push: idx={idx}, result={'불량품' if is_anomaly else '정상품'}, final={score:.4f}")
+                                logger.info(f"진동 세그먼트 결과 큐 push: idx={idx}, result={'불량품' if is_anomaly else '정상품'}, final={final_score:.4f}")
                             except Full:
                                 logger.warning(f"진동 세그먼트 결과 큐 전송 실패: {idx}")
                                 pass

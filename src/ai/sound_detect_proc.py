@@ -67,6 +67,12 @@ def detect_proc_worker(shared_queue, detect_queue, db_queue, config_info, log_fi
     progress_step  = int(config_info.get_config("detection.progress_step", 5))  # % 단위
     n_mfcc        = config_info.get_config("detection.n_mfcc", 13)
 
+    # 정규화 파라미터 추가 (학습 코드와 일치)
+    ae_min = config_info.get_config("detection.ae_min", 0.0)
+    ae_max = config_info.get_config("detection.ae_max", 1.0)
+    dtw_min = config_info.get_config("detection.dtw_min", 0.0)
+    dtw_max = config_info.get_config("detection.dtw_max", 1.0)
+
     # 초기 margin 설정
     margin = float(config_info.get_config("detection.margin", 1.0))
 
@@ -163,17 +169,18 @@ def detect_proc_worker(shared_queue, detect_queue, db_queue, config_info, log_fi
                     # AutoEncoder 복원 손실 계산
                     ae_loss = calculate_ae_loss(spectrogram, autoencoder)
                     
-                    # config에서 가져온 임계값 사용
-                    # ae_threshold와 dtw_threshold는 이미 위에서 config에서 가져왔음
+                    # 학습 코드와 동일한 정규화 방식 적용
+                    ae_norm = (ae_loss - ae_min) / (ae_max - ae_min + 1e-8)
+                    dtw_norm = (dtw_score - dtw_min) / (dtw_max - dtw_min + 1e-8)
                     
-                    # 노트북 방식: 최종 점수 계산 (AE/임계값 * 가중치 + DTW/임계값 * 가중치)
-                    score = (ae_loss / ae_threshold) * ae_weight + (dtw_score / dtw_threshold) * dtw_weight
+                    # 학습 코드와 동일한 최종 점수 계산
+                    final_score = ae_weight * ae_norm + dtw_weight * dtw_norm
                     
                     # 실시간으로 최신 margin 값 가져오기
                     current_config = get_current_config()
                     current_margin = float(current_config.get_config("detection.margin", 1.05))
                     
-                    clip_result = "불량품" if score > current_margin else "양품"
+                    clip_result = "불량품" if final_score > current_margin else "양품"
                     any_bad = any_bad or (clip_result == "불량품")
 
                     seg_start = round(idx * clip_duration, 3)
@@ -197,14 +204,14 @@ def detect_proc_worker(shared_queue, detect_queue, db_queue, config_info, log_fi
                         'result': clip_result,
                         'dtw_score': dtw_score,
                         'ae_loss': ae_loss,
-                        'final_score': score,
+                        'final_score': final_score,
                         'duration': len(audio_data) / sample_rate,
                         'sample_rate': sample_rate
                     }
                     
                     # 평가 큐에만 전송 (DB는 파일 완료 시에만 처리)
                     detect_queue.put(segment_data)
-                    logger.info(f"세그먼트 결과 큐 push: idx={idx}, result={clip_result}, final={score:.4f}")
+                    logger.info(f"세그먼트 결과 큐 push: idx={idx}, result={clip_result}, final={final_score:.4f}")
 
                     # 진행률 계산/로그/전송 (progress_step% 단위로만)
                     pct = int(((idx + 1) * 100) / total_segs)

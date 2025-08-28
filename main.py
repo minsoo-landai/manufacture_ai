@@ -13,7 +13,6 @@ from src.ai.vib_detect_if import detect_if_run as vib_detect_if_run
 from src.db.db_if import db_if_run, db_if_init
 from src.evaluation.evaluation_if import evaluation_if_run, vib_evaluation_if_run
 from src.evaluation.performance_if import performance_if_run
-from src.ai.sound_train_if import sound_train_if_run    # 학습시 진행
 
 # TensorFlow/Protobuf 경고 숨기기
 warnings.filterwarnings('ignore', category=UserWarning, module='google.protobuf')
@@ -25,13 +24,7 @@ def main():
     try:
         # 명령행 인수 파싱
         parser = argparse.ArgumentParser(description='AI 사운드/진동 탐지 시스템')
-        # parser.add_argument('--test-vibration', action='store_true', help='진동 파이프라인 테스트 실행')
         args = parser.parse_args()
-        
-        # 진동 파이프라인 테스트 모드 (제거됨)
-        # if args.test_vibration:
-        #     test_vibration_pipeline()
-        #     return
         
         # 설정 로드
         config = Config("config.json")
@@ -146,10 +139,7 @@ def main():
         print(f"메인 함수 오류: {e}")
         sys.exit(1)
 
-# 진동 파이프라인 테스트 함수 (제거됨)
-# def test_vibration_pipeline():
-#     """진동 파이프라인 테스트 함수"""
-#     pass
+
 
 if __name__ == "__main__":
     main()
