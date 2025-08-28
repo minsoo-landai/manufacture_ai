@@ -528,39 +528,47 @@ def create_clip_evaluation_data(info, processing_time, file_path, performance_me
 
 
 def move_file_to_destination(file_path, result, reserved_dir, logger):
-    """파일을 결과에 따라 적절한 위치로 이동 (소리 데이터용)"""
-    try:
-        if not os.path.exists(file_path):
-            logger.warning(f"이동할 소리 파일이 없음: {file_path}")
-            return
+    """파일을 결과에 따라 적절한 위치로 이동 (소리 데이터용) - 주석처리됨"""
+    # 파일 이동 기능 주석처리
+    logger.info(f"소리 파일 이동 기능이 비활성화됨: {file_path}")
+    return
+    
+    # try:
+    #     if not os.path.exists(file_path):
+    #         logger.warning(f"이동할 소리 파일이 없음: {file_path}")
+    #         return
 
-        filename = os.path.basename(file_path)
-        base_name, ext = os.path.splitext(filename)
+    #     filename = os.path.basename(file_path)
+    #     base_name, ext = os.path.splitext(filename)
         
-        if result == "불량품":
-            # 소리 불량품은 sound_reserved/abnormal로 이동
-            dest_path = os.path.join(reserved_dir, "abnormal", f"{base_name}_sound_reserved{ext}")
-        else:
-            # 소리 양품은 sound_reserved/normal로 이동
-            dest_path = os.path.join(reserved_dir, "normal", f"{base_name}_sound_split{ext}")
+    #     if result == "불량품":
+    #         # 소리 불량품은 sound_reserved/abnormal로 이동
+    #         dest_path = os.path.join(reserved_dir, "abnormal", f"{base_name}_sound_reserved{ext}")
+    #     else:
+    #         # 소리 양품은 sound_reserved/normal로 이동
+    #         dest_path = os.path.join(reserved_dir, "normal", f"{base_name}_sound_split{ext}")
 
-        os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-        shutil.move(file_path, dest_path)
-        logger.info(f"소리 탐지 완료된 파일 이동됨 → {dest_path}")
+    #     os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+    #     shutil.move(file_path, dest_path)
+    #     logger.info(f"소리 탐지 완료된 파일 이동됨 → {dest_path}")
 
-    except Exception as e:
-        logger.error(f"소리 파일 이동 실패: {e}")
+    # except Exception as e:
+    #     logger.error(f"소리 파일 이동 실패: {e}")
 
 
 def delete_original_folder(file_path, raw_data_dir, logger):
-    """원본 폴더 삭제"""
-    try:
-        file_dir = os.path.dirname(file_path)
-        if file_dir != raw_data_dir and os.path.exists(file_dir):
-            shutil.rmtree(file_dir)
-            logger.info(f"원본 폴더 삭제됨: {file_dir}")
-    except Exception as e:
-        logger.error(f"폴더 삭제 실패: {e}")
+    """원본 폴더 삭제 - 주석처리됨"""
+    # 폴더 삭제 기능 주석처리
+    logger.info(f"폴더 삭제 기능이 비활성화됨: {file_path}")
+    return
+    
+    # try:
+    #     file_dir = os.path.dirname(file_path)
+    #     if file_dir != raw_data_dir and os.path.exists(file_dir):
+    #         shutil.rmtree(file_dir)
+    #         logger.info(f"원본 폴더 삭제됨: {file_dir}")
+    # except Exception as e:
+    #     logger.error(f"폴더 삭제 실패: {e}")
 
 
 def create_missing_file_log(file_path, logger):
@@ -1006,39 +1014,47 @@ def process_evaluation_results(evaluation_data, config):
 
 
 def move_file_to_destination(file_path, result, reserved_dir, logger):
-    """파일을 결과에 따라 적절한 위치로 이동 (진동 데이터용)"""
-    try:
-        if not os.path.exists(file_path):
-            logger.warning(f"이동할 진동 파일이 없음: {file_path}")
-            return
+    """파일을 결과에 따라 적절한 위치로 이동 (진동 데이터용) - 주석처리됨"""
+    # 파일 이동 기능 주석처리
+    logger.info(f"진동 파일 이동 기능이 비활성화됨: {file_path}")
+    return
+    
+    # try:
+    #     if not os.path.exists(file_path):
+    #         logger.warning(f"이동할 진동 파일이 없음: {file_path}")
+    #         return
 
-        filename = os.path.basename(file_path)
-        base_name, ext = os.path.splitext(filename)
+    #     filename = os.path.basename(file_path)
+    #     base_name, ext = os.path.splitext(filename)
         
-        if result == "불량품":
-            # 진동 불량품은 vib_reserved/abnormal로 이동
-            dest_path = os.path.join(reserved_dir, "abnormal", f"{base_name}_vib_reserved{ext}")
-        else:
-            # 진동 양품은 vib_reserved/normal로 이동
-            dest_path = os.path.join(reserved_dir, "normal", f"{base_name}_vib_split{ext}")
+    #     if result == "불량품":
+    #         # 진동 불량품은 vib_reserved/abnormal로 이동
+    #         dest_path = os.path.join(reserved_dir, "abnormal", f"{base_name}_vib_reserved{ext}")
+    #     else:
+    #         # 진동 양품은 vib_reserved/normal로 이동
+    #         dest_path = os.path.join(reserved_dir, "normal", f"{base_name}_vib_split{ext}")
 
-        os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-        shutil.move(file_path, dest_path)
-        logger.info(f"진동 탐지 완료된 파일 이동됨 → {dest_path}")
+    #     os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+    #     shutil.move(file_path, dest_path)
+    #     logger.info(f"진동 탐지 완료된 파일 이동됨 → {dest_path}")
 
-    except Exception as e:
-        logger.error(f"진동 파일 이동 실패: {e}")
+    # except Exception as e:
+    #     logger.error(f"진동 파일 이동 실패: {e}")
 
 
 def delete_original_folder(file_path, raw_data_dir, logger):
-    """원본 폴더 삭제"""
-    try:
-        file_dir = os.path.dirname(file_path)
-        if file_dir != raw_data_dir and os.path.exists(file_dir):
-            shutil.rmtree(file_dir)
-            logger.info(f"원본 진동 폴더 삭제됨: {file_dir}")
-    except Exception as e:
-        logger.error(f"진동 폴더 삭제 실패: {e}")
+    """원본 폴더 삭제 - 주석처리됨"""
+    # 폴더 삭제 기능 주석처리
+    logger.info(f"진동 폴더 삭제 기능이 비활성화됨: {file_path}")
+    return
+    
+    # try:
+    #     file_dir = os.path.dirname(file_path)
+    #     if file_dir != raw_data_dir and os.path.exists(file_dir):
+    #         shutil.rmtree(file_dir)
+    #         logger.info(f"원본 진동 폴더 삭제됨: {file_dir}")
+    # except Exception as e:
+    #     logger.error(f"진동 폴더 삭제 실패: {e}")
 
 
 def create_missing_file_log(file_path, logger):
@@ -1054,5 +1070,3 @@ def create_missing_file_log(file_path, logger):
         logger.warning(f"진동 파일 없음 로그 기록됨: {file_path}")
     except Exception as e:
         logger.error(f"진동 파일 없음 로그 생성 실패: {e}")
-
-

@@ -67,7 +67,7 @@ class Config:
                     "enable_file_completion_check": True, # 파일 완성 체크 활성화
                     "file_completion_timeout": 3.0,       # 파일 완성 대기 시간 (초)
                     "enable_next_file_check": True,       # 다음 파일 체크 활성화
-                    "move_to_reserved": True,             # 처리 후 예약 디렉토리로 이동
+                    "move_to_reserved": False,            # 처리 후 예약 디렉토리로 이동 (비활성화)
                     "audio_duration_tolerance": 0.5,      # 오디오 길이 허용 오차 (초)
                     "next_file_check_retries": 3,         # 다음 파일 체크 재시도 횟수
                     "next_file_check_interval": 1.0,      # 다음 파일 체크 간격 (초)
