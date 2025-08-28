@@ -1,6 +1,6 @@
 {
   "data": {
-    "detect_dir": "data/raw_data/",
+    "detect_dir": "/home/minsoo0807/deagu_manufacture_ai/data/raw_data",
     "reference_dir": "data/reference/normal_reference.wav",
     "raw_data_dir": "data/raw_data",
     "sound_raw_dir": "data/raw_data/sound",
@@ -29,8 +29,8 @@
     "margin": 1.05,
     "ae_weight": 0.5,
     "dtw_weight": 0.5,
-    "dtw_threshold": 30000.0,
-    "ae_threshold": 0.005,
+    "dtw_threshold": 2390.08,
+    "ae_threshold": 0.000404,
     "epochs": 300,
     "batch_size": 16,
     "learning_rate": 0.001,
@@ -95,4 +95,4 @@
     "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     "file_path": "logs/main.log"
   }
-}
+} 
