@@ -60,15 +60,18 @@ def load_and_standardize_csv(file_path, skiprows=0, header=None, names=['Acc1', 
     df_header = pd.read_csv(file_path, nrows=1)
     
     if 'vibration' in df_header.columns and 'x' in df_header.columns:
-        # 헤더가 있는 경우
+        # 헤더가 있는 경우 - 실제 데이터 형식에 맞게 수정
         df = pd.read_csv(file_path)
         df = df.rename(columns={
             'x': 'Acc1',
-            'y': 'Acc2',
+            'y': 'Acc2', 
             'z': 'Acc3',
             'vibration': 'Vibration',
             'audio': 'Microphone'
         })
+    elif 'Acc1' in df_header.columns and 'Acc2' in df_header.columns:
+        # 이미 Acc1, Acc2, Acc3 형식인 경우
+        df = pd.read_csv(file_path)
     else:
         # 헤더가 없는 경우
         df = pd.read_csv(file_path, skiprows=skiprows, header=header, names=names)
@@ -186,6 +189,7 @@ def load_and_preprocess_vibration_data_from_folder(folder_path, fs=16, duration=
                 acc3 = df['Acc3'].values.astype(float)
             else:
                 print(f"⚠ 경고: {csv_file}에서 적절한 컬럼을 찾을 수 없습니다. 건너뜁니다.")
+                print(f"  사용 가능한 컬럼: {list(df.columns)}")
                 continue
             
             # 파일별로 개별 처리
@@ -725,7 +729,10 @@ def detect_proc_worker(vib_shared_queue, detect_queue, db_queue, config_info, lo
         from queue import Full
         
         logger = Logger("vib_detector", log_file, log_level, log_format)
-        logger.info("vib_detect_proc_worker 시작")
+        logger.info("=== vib_detect_proc_worker 시작 ===")
+        logger.info(f"진동 탐지 큐 크기: {vib_shared_queue.qsize()}")
+        logger.info(f"진동 탐지 결과 큐 크기: {detect_queue.qsize()}")
+        logger.info(f"DB 큐 크기: {db_queue.qsize()}")
 
         # 설정을 실시간으로 다시 로드하는 함수
         def get_current_config():
@@ -778,21 +785,54 @@ def detect_proc_worker(vib_shared_queue, detect_queue, db_queue, config_info, lo
                     folder_info = file_info.get('folder_info', {})
                     timestamp = file_info['timestamp']
 
-                    logger.info(f"진동 데이터 파일 처리 시작: {file_path}")
+                    logger.info(f"=== 진동 데이터 파일 처리 시작 ===")
+                    logger.info(f"파일 경로: {file_path}")
+                    logger.info(f"폴더 정보: {folder_info}")
+                    logger.info(f"타임스탬프: {timestamp}")
                     
-                    # 진동 데이터 로드 및 전처리
-                    vib_xyz_dict = load_and_preprocess_vibration_data_from_folder(
-                        folder_path=os.path.dirname(file_path),
-                        fs=fs,
-                        duration=duration
-                    )
+                    # 진동 데이터 로드 및 전처리 - 개별 파일 처리
+                    try:
+                        # 개별 CSV 파일 로드
+                        df = load_and_standardize_csv(file_path)
+                        
+                        # 3축 데이터 병합
+                        acc1_data = df['Acc1'].values
+                        acc2_data = df['Acc2'].values
+                        acc3_data = df['Acc3'].values
+                        
+                        # 윈도우 크기 계산
+                        win_len = fs * duration
+                        
+                        # 데이터가 윈도우 크기보다 작으면 전체 데이터를 하나의 윈도우로 사용
+                        if len(acc1_data) < win_len:
+                            win_len = len(acc1_data)
+                        
+                        # 윈도우 분할
+                        vib_xyz_dict = {
+                            "Acc1": [acc1_data[:win_len]],
+                            "Acc2": [acc2_data[:win_len]],
+                            "Acc3": [acc3_data[:win_len]],
+                            "filenames": [os.path.basename(file_path)]
+                        }
+                        
+                        logger.info(f"진동 파일 로드 완료: {file_path}")
+                        logger.info(f"윈도우 크기: {win_len}")
+                        logger.info(f"Acc1 데이터 길이: {len(acc1_data)}")
+                        logger.info(f"Acc2 데이터 길이: {len(acc2_data)}")
+                        logger.info(f"Acc3 데이터 길이: {len(acc3_data)}")
+                        
+                    except Exception as e:
+                        logger.error(f"진동 파일 로드 실패: {file_path}, 오류: {e}")
+                        continue
                 
                     if vib_xyz_dict is None or len(vib_xyz_dict["Acc1"]) == 0:
                         logger.warning("진동 데이터가 비어 있음")
                         continue
 
                     total_segs = len(vib_xyz_dict["Acc1"])
-                    logger.info(f"{total_segs}개의 진동 세그먼트로 분할됨")
+                    logger.info(f"=== 진동 세그먼트 처리 시작 ===")
+                    logger.info(f"총 세그먼트 수: {total_segs}")
+                    logger.info(f"파일명: {vib_xyz_dict['filenames']}")
 
                     # 시작 진행률(0%) 알림
                     try:
@@ -815,7 +855,7 @@ def detect_proc_worker(vib_shared_queue, detect_queue, db_queue, config_info, lo
                     any_bad = False
                     last_logged_pct = -1
 
-                    # 각 세그먼트를 개별적으로 처리
+                    # 각 세그먼트를 개별적으로 처리 (진동은 보통 하나의 파일이 하나의 세그먼트)
                     for idx in range(total_segs):
                         # 중복 처리 방지
                         segment_key = f"{file_path}_{idx}"
@@ -857,7 +897,7 @@ def detect_proc_worker(vib_shared_queue, detect_queue, db_queue, config_info, lo
                             # 학습에서 계산된 임계값으로 이상 탐지
                             is_anomaly = final_score > final_threshold
                             
-                            logger.debug(f"세그먼트 {idx} - AE: {ae_loss:.6f}->{ae_norm:.6f}, DTW: {dtw_dist:.6f}->{dtw_norm:.6f}, 최종: {final_score:.6f}, 임계값: {final_threshold:.6f}")
+                            logger.info(f"진동 세그먼트 {idx} - AE: {ae_loss:.6f}->{ae_norm:.6f}, DTW: {dtw_dist:.6f}->{dtw_norm:.6f}, 최종: {final_score:.6f}, 임계값: {final_threshold:.6f}")
 
                             if is_anomaly:
                                 any_bad = True
@@ -868,6 +908,8 @@ def detect_proc_worker(vib_shared_queue, detect_queue, db_queue, config_info, lo
                                     'unit': 'segment',
                                     'timestamp': timestamp,
                                     'file_path': file_path,
+                                    'original_filename': os.path.basename(file_path),
+                                    'parent_file_name': os.path.basename(file_path),
                                     'folder_info': folder_info,
                                     'segment_index': idx,
                                     'segment_total': total_segs,
@@ -909,13 +951,16 @@ def detect_proc_worker(vib_shared_queue, detect_queue, db_queue, config_info, lo
                     # 최종 결과 전송
                     try:
                         detect_queue.put({
-                            'unit': 'vibration',
+                            'unit': 'file_done',
                             'timestamp': timestamp,
                             'file_path': file_path,
+                            'original_filename': os.path.basename(file_path),
                             'folder_info': folder_info,
                             'segment_total': total_segs,
+                            'file_result': "불량품" if any_bad else "정상품",
                             'anomaly_detected': any_bad,
-                            'margin': margin
+                            'margin': margin,
+                            'duration': total_segs * duration  # 총 세그먼트 수 * 세그먼트 길이
                         }, block=False)
                     except Full:
                         pass
@@ -934,7 +979,11 @@ def detect_proc_worker(vib_shared_queue, detect_queue, db_queue, config_info, lo
                     except Full:
                         pass
 
-                    logger.info(f"진동 데이터 처리 완료: {file_path} (이상: {'감지됨' if any_bad else '없음'})")
+                    logger.info(f"=== 진동 데이터 처리 완료 ===")
+                    logger.info(f"파일 경로: {file_path}")
+                    logger.info(f"총 세그먼트 수: {total_segs}")
+                    logger.info(f"이상 탐지: {'감지됨' if any_bad else '없음'}")
+                    logger.info(f"최종 결과: {'불량품' if any_bad else '정상품'}")
 
             except Exception as e:
                 logger.error(f"진동 데이터 처리 중 오류: {e}")

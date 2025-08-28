@@ -587,13 +587,15 @@ def vib_evaluation_proc_worker(detect_queue, config_info, log_file, log_level, l
     - 'file_done': 파일 이동/정리
     """
     logger = Logger("vib_file_processor", log_file, log_level, log_format)
-    logger.info("=== vib_evaluation_proc_worker 시작 ===")
-    logger.info(f"detect_queue 크기: {detect_queue.qsize()}")
-    logger.info(f"save_evaluation_results 설정: {config_info.get_config('evaluation.save_evaluation_results', True)}")
-
     raw_data_dir = config_info.get_config("data.raw_data_dir")
     reserved_dir = config_info.get_config("data.vib_reserved_dir")
     save_evaluation_results = config_info.get_config("evaluation.save_evaluation_results", True)
+    
+    logger.info("=== vib_evaluation_proc_worker 시작 ===")
+    logger.info(f"진동 탐지 결과 큐 크기: {detect_queue.qsize()}")
+    logger.info(f"save_evaluation_results 설정: {save_evaluation_results}")
+    logger.info(f"raw_data_dir: {raw_data_dir}")
+    logger.info(f"reserved_dir: {reserved_dir}")
 
     results_dir = "results"
     os.makedirs(results_dir, exist_ok=True)
@@ -679,7 +681,10 @@ def vib_evaluation_proc_worker(detect_queue, config_info, log_file, log_level, l
                     continue
                 
                 processed_segments.add(segment_key)
-                logger.info(f"진동 세그먼트 데이터 처리 시작: {fp}, 세그먼트 인덱스: {segment_index}")
+                logger.info(f"=== 진동 세그먼트 데이터 처리 시작 ===")
+                logger.info(f"파일 경로: {fp}")
+                logger.info(f"세그먼트 인덱스: {segment_index}")
+                logger.info(f"세그먼트 키: {segment_key}")
                 
                 # 파일 경로 검증 - raw_data에서 처리하므로 원본 경로 확인
                 file_exists = os.path.exists(fp)
@@ -786,7 +791,12 @@ def vib_evaluation_proc_worker(detect_queue, config_info, log_file, log_level, l
                         with open(clip_csv, 'a', newline='', encoding='utf-8') as f:
                             w = csv.DictWriter(f, fieldnames=clip_csv_headers)
                             w.writerow(row)
-                        logger.info(f"진동 세그먼트 결과 저장 완료: {info.get('segment_index')} - 정확도: {acc:.2f}%, 정밀도: {prec:.2f}%, 재현율: {rec:.2f}%, F1: {f1:.2f}%")
+                        logger.info(f"=== 진동 세그먼트 결과 저장 완료 ===")
+                        logger.info(f"세그먼트 인덱스: {info.get('segment_index')}")
+                        logger.info(f"정확도: {acc:.2f}%")
+                        logger.info(f"정밀도: {prec:.2f}%")
+                        logger.info(f"재현율: {rec:.2f}%")
+                        logger.info(f"F1: {f1:.2f}%")
                     except Exception as csv_error:
                         logger.error(f"CSV 저장 중 오류: {csv_error}")
                         logger.error(f"저장하려던 데이터: {row}")
@@ -802,7 +812,11 @@ def vib_evaluation_proc_worker(detect_queue, config_info, log_file, log_level, l
                 continue
 
             if unit == 'file_done':
+                logger.info(f"=== 진동 파일 완료 처리 시작 ===")
                 fp = info['file_path']
+                logger.info(f"파일 경로: {fp}")
+                logger.info(f"파일 결과: {info.get('file_result', '양품')}")
+                logger.info(f"세그먼트 총 수: {info.get('segment_total', 0)}")
                 
                 # 현재 파일의 성능 계산 및 저장
                 if current_file_segments:
@@ -817,8 +831,30 @@ def vib_evaluation_proc_worker(detect_queue, config_info, log_file, log_level, l
                     # 개별 파일 성능 CSV 저장 (중복 방지)
                     if save_evaluation_results:
                         save_single_file_performance_csv(file_perf, results_dir, today, logger)
+                else:
+                    logger.warning(f"진동 파일 완료 처리 중 current_file_segments가 비어있음: {fp}")
+                    # 세그먼트 데이터가 없어도 기본 정보만 저장
+                    if save_evaluation_results:
+                        basic_file_perf = {
+                            'file_path': fp,
+                            'original_filename': info.get('original_filename', ''),
+                            'file_result': info.get('file_result', '양품'),
+                            'segment_total': info.get('segment_total', 0),
+                            'duration': info.get('duration', 0.0),
+                            'file_accuracy': 0.0,
+                            'file_precision': 0.0,
+                            'file_recall': 0.0,
+                            'file_f1_score': 0.0,
+                            'segment_accuracy': 0.0,
+                            'segment_precision': 0.0,
+                            'segment_recall': 0.0,
+                            'segment_f1_score': 0.0,
+                            'true_label': 0,
+                            'pred_label': 0
+                        }
+                        save_single_file_performance_csv(basic_file_perf, results_dir, today, logger)
                 
-                # raw_data 파일 이동 처리
+                # raw_data 파일 이동 처리 (진동 파일용)
                 if os.path.exists(fp):
                     move_file_to_destination(fp, info.get('file_result', '양품'),
                                              reserved_dir, logger)
